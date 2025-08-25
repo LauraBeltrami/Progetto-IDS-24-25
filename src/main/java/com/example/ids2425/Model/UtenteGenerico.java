@@ -1,20 +1,37 @@
 package com.example.ids2425.Model;
 
+import jakarta.persistence.*;
 import java.util.ArrayList;
 import java.util.List;
 
+@Entity
+@Table(name = "utenti_generici")
 public class UtenteGenerico {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
     private String nome;
     private String email;
 
-    private List<Ruolo> ruoli;
+    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinTable(
+            name = "utente_ruolo",
+            joinColumns = @JoinColumn(name = "utente_id"),
+            inverseJoinColumns = @JoinColumn(name = "ruolo_id")
+    )
+    private List<Ruolo> ruoli = new ArrayList<>();
 
     public UtenteGenerico(int id, String nome, String email) {
         this.id = id;
         this.nome = nome;
         this.email = email;
+        this.ruoli = new ArrayList<>();
+    }
+
+    // Costruttore vuoto richiesto da JPA
+    public UtenteGenerico() {
         this.ruoli = new ArrayList<>();
     }
 
@@ -50,10 +67,8 @@ public class UtenteGenerico {
         return ruolo != null && ruoli.contains(ruolo);
     }
 
-    // opzionale: compatibilità con stringhe
     public boolean haRuolo(String nomeRuolo) {
         Ruolo r = Ruolo.parse(nomeRuolo);
         return r != null && ruoli.contains(r);
     }
 }
-

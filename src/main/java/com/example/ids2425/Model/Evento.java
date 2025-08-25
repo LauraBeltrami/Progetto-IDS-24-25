@@ -1,18 +1,30 @@
 package com.example.ids2425.Model;
 
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+@Entity
+@Table(name = "eventi")
 public class Evento {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
     private String nomeEvento;
     private String luogo;
     private LocalDateTime data;
     private String descrizione;
 
     // prodotti collegati all'evento
+    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinTable(
+            name = "evento_prodotto",
+            joinColumns = @JoinColumn(name = "evento_id"),
+            inverseJoinColumns = @JoinColumn(name = "prodotto_id")
+    )
     private List<Prodotto> prodotti;
 
     public Evento(int id, String nomeEvento, String luogo, LocalDateTime data, String descrizione) {
@@ -57,5 +69,9 @@ public class Evento {
         if (p == null) return;
         prodotti.removeIf(x -> x.getId() == p.getId());
     }
-}
 
+    // Costruttore vuoto richiesto da JPA
+    public Evento() {
+        this.prodotti = new ArrayList<>();
+    }
+}

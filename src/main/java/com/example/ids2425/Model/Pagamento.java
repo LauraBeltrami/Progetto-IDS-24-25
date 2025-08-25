@@ -1,11 +1,20 @@
 package com.example.ids2425.Model;
 
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
+@Entity
+@Table(name = "pagamenti")
 public class Pagamento {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
+    @ManyToOne
+    @JoinColumn(name = "acquirente_id")
     private Acquirente acquirente;
+
     private double importoTotale;
     private String metodo;    // es: "Carta di credito", "PayPal"
     private String stato;     // es: "IN_ATTESA", "COMPLETATO", "FALLITO"
@@ -19,6 +28,9 @@ public class Pagamento {
         this.stato = "IN_ATTESA";
         this.dataOperazione = LocalDateTime.now();
     }
+
+    // Costruttore vuoto richiesto da JPA
+    public Pagamento() {}
 
     // getter e setter
     public int getId() { return id; }
@@ -48,4 +60,3 @@ public class Pagamento {
         this.stato = "FALLITO";
     }
 }
-

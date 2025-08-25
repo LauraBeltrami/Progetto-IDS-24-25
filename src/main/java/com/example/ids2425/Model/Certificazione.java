@@ -1,13 +1,25 @@
 package com.example.ids2425.Model;
 
+import jakarta.persistence.*;
+
+@Entity
 public class Certificazione {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
     private String descrizione;
 
     // riferimenti semplici ad oggetti del modello
+    @ManyToOne
     private Prodotto prodotto;
+
+    @ManyToOne
     private Curatore curatoreValidatore;
+
+    // costruttore vuoto richiesto da JPA
+    public Certificazione() {}
 
     public Certificazione(int id, String descrizione, Prodotto prodotto, Curatore curatoreValidatore) {
         this.id = id;
@@ -31,4 +43,3 @@ public class Certificazione {
         this.curatoreValidatore = curatoreValidatore;
     }
 }
-

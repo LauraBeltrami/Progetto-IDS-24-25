@@ -1,8 +1,15 @@
 package com.example.ids2425.Model;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "gestori_piattaforma")
 public class GestorePiattaforma {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
     private String nome;
     private String stato; // es: "ATTIVO", "SOSPESO"
 
@@ -11,6 +18,9 @@ public class GestorePiattaforma {
         this.nome = nome;
         this.stato = stato;
     }
+
+    // Costruttore vuoto richiesto da JPA
+    public GestorePiattaforma() {}
 
     // getter/setter
     public int getId() { return id; }
@@ -35,5 +45,3 @@ public class GestorePiattaforma {
         }
     }
 }
-
-
