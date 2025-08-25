@@ -15,12 +15,11 @@ public class UtenteGenerico {
     private String nome;
     private String email;
 
-    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
-    @JoinTable(
-            name = "utente_ruolo",
-            joinColumns = @JoinColumn(name = "utente_id"),
-            inverseJoinColumns = @JoinColumn(name = "ruolo_id")
-    )
+    // Salviamo l'enum come stringa in una tabella separata
+    @ElementCollection(targetClass = Ruolo.class)
+    @CollectionTable(name = "utente_ruoli", joinColumns = @JoinColumn(name = "utente_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ruolo")
     private List<Ruolo> ruoli = new ArrayList<>();
 
     public UtenteGenerico(int id, String nome, String email) {
@@ -30,10 +29,7 @@ public class UtenteGenerico {
         this.ruoli = new ArrayList<>();
     }
 
-    // Costruttore vuoto richiesto da JPA
-    public UtenteGenerico() {
-        this.ruoli = new ArrayList<>();
-    }
+    public UtenteGenerico() {} // richiesto da JPA
 
     // --- getter/setter ---
     public int getId() { return id; }
