@@ -2,6 +2,7 @@ package com.example.ids2425.Service;
 
 import com.example.ids2425.Model.Evento;
 import com.example.ids2425.Model.Prodotto;
+import com.example.ids2425.Model.UtenteGenerico;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -35,5 +36,14 @@ public class EventoService {
     // Opzionale: per ottenere la lista completa
     public List<Evento> getEventi() {
         return eventi;
+    }
+    public void invitaUtente(Evento e, UtenteGenerico u) {
+        if (e == null || u == null) return;
+        e.invitaUtente(u);
+    }
+
+    public void rimuoviInvitato(Evento e, UtenteGenerico u) {
+        if (e == null || u == null) return;
+        e.rimuoviInvitato(u);
     }
 }

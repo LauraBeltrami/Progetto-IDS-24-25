@@ -13,35 +13,45 @@ public class Evento {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
 
-    private String nomeEvento;
+    private String nome;
     private String luogo;
     private LocalDateTime data;
     private String descrizione;
 
-    // prodotti collegati all'evento
-    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    // Relazione con i prodotti (se già esiste, lasciala com’è)
+    @ManyToMany
     @JoinTable(
-            name = "evento_prodotto",
+            name = "evento_prodotti",
             joinColumns = @JoinColumn(name = "evento_id"),
             inverseJoinColumns = @JoinColumn(name = "prodotto_id")
     )
-    private List<Prodotto> prodotti;
+    private List<Prodotto> prodotti = new ArrayList<>();
 
-    public Evento(int id, String nomeEvento, String luogo, LocalDateTime data, String descrizione) {
+    // 🔹 Relazione con gli invitati
+    @ManyToMany
+    @JoinTable(
+            name = "evento_invitati",
+            joinColumns = @JoinColumn(name = "evento_id"),
+            inverseJoinColumns = @JoinColumn(name = "utente_id")
+    )
+    private List<UtenteGenerico> invitati = new ArrayList<>();
+
+    public Evento() {}
+
+    public Evento(int id, String nome, String luogo, LocalDateTime data, String descrizione) {
         this.id = id;
-        this.nomeEvento = nomeEvento;
+        this.nome = nome;
         this.luogo = luogo;
         this.data = data;
         this.descrizione = descrizione;
-        this.prodotti = new ArrayList<>();
     }
 
-    // getter e setter
+    // --- getter/setter ---
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
 
-    public String getNomeEvento() { return nomeEvento; }
-    public void setNomeEvento(String nomeEvento) { this.nomeEvento = nomeEvento; }
+    public String getNome() { return nome; }
+    public void setNome(String nome) { this.nome = nome; }
 
     public String getLuogo() { return luogo; }
     public void setLuogo(String luogo) { this.luogo = luogo; }
@@ -55,23 +65,28 @@ public class Evento {
     public List<Prodotto> getProdotti() { return prodotti; }
     public void setProdotti(List<Prodotto> prodotti) { this.prodotti = prodotti; }
 
-    // utilità
+    public List<UtenteGenerico> getInvitati() { return invitati; }
+    public void setInvitati(List<UtenteGenerico> invitati) { this.invitati = invitati; }
+
+    // --- Metodi di supporto ---
     public void aggiungiProdotto(Prodotto p) {
-        if (p == null) return;
-        // evita duplicati per id
-        for (Prodotto x : prodotti) {
-            if (x.getId() == p.getId()) return;
+        if (p != null && !prodotti.contains(p)) {
+            prodotti.add(p);
         }
-        prodotti.add(p);
     }
 
     public void rimuoviProdotto(Prodotto p) {
-        if (p == null) return;
-        prodotti.removeIf(x -> x.getId() == p.getId());
+        prodotti.remove(p);
     }
 
-    // Costruttore vuoto richiesto da JPA
-    public Evento() {
-        this.prodotti = new ArrayList<>();
+    public void invitaUtente(UtenteGenerico u) {
+        if (u != null && !invitati.contains(u)) {
+            invitati.add(u);
+        }
     }
+
+    public void rimuoviInvitato(UtenteGenerico u) {
+        invitati.remove(u);
+    }
+
 }
