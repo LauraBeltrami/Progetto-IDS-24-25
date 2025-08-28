@@ -2,20 +2,15 @@ package com.example.ids2425.Service;
 
 import com.example.ids2425.Model.Evento;
 import com.example.ids2425.Model.Prodotto;
-import com.example.ids2425.Model.UtenteGenerico;
+import com.example.ids2425.Model.Acquirente;
+import com.example.ids2425.Model.Venditore;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 public class EventoService {
 
-    private List<Evento> eventi = new ArrayList<>();
-
     public Evento creaEvento(int id, String nome, String luogo, LocalDateTime data, String descrizione) {
-        Evento e = new Evento(id, nome, luogo, data, descrizione);
-        eventi.add(e);
-        return e;
+        return new Evento(id, nome, luogo, data, descrizione);
     }
 
     public void aggiungiProdotto(Evento e, Prodotto p) {
@@ -28,22 +23,25 @@ public class EventoService {
         e.rimuoviProdotto(p);
     }
 
-    // 🔹 Nuovo metodo: elimina evento
-    public boolean eliminaEvento(int id) {
-        return eventi.removeIf(e -> e.getId() == id);
+    // --- NUOVI METODI PER INVITI E ACCETTAZIONE ---
+
+    public void invitaAcquirente(Evento evento, Acquirente acquirente) {
+        if (evento == null || acquirente == null) return;
+        evento.invitaAcquirente(acquirente);
     }
 
-    // Opzionale: per ottenere la lista completa
-    public List<Evento> getEventi() {
-        return eventi;
-    }
-    public void invitaUtente(Evento e, UtenteGenerico u) {
-        if (e == null || u == null) return;
-        e.invitaUtente(u);
+    public void invitaVenditore(Evento evento, Venditore venditore) {
+        if (evento == null || venditore == null) return;
+        evento.invitaVenditore(venditore);
     }
 
-    public void rimuoviInvitato(Evento e, UtenteGenerico u) {
-        if (e == null || u == null) return;
-        e.rimuoviInvitato(u);
+    public void accettaInvitoAcquirente(Evento evento, Acquirente acquirente) {
+        if (evento == null || acquirente == null) return;
+        evento.accettaInvitoAcquirente(acquirente);
+    }
+
+    public void accettaInvitoVenditore(Evento evento, Venditore venditore) {
+        if (evento == null || venditore == null) return;
+        evento.accettaInvitoVenditore(venditore);
     }
 }

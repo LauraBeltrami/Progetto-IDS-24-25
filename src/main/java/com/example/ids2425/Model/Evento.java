@@ -2,8 +2,7 @@ package com.example.ids2425.Model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Entity
 @Table(name = "eventi")
@@ -13,45 +12,69 @@ public class Evento {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
 
-    private String nome;
+    private String nomeEvento;
     private String luogo;
     private LocalDateTime data;
     private String descrizione;
 
-    // Relazione con i prodotti (se già esiste, lasciala com’è)
-    @ManyToMany
+    // prodotti collegati all'evento
+    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinTable(
-            name = "evento_prodotti",
+            name = "evento_prodotto",
             joinColumns = @JoinColumn(name = "evento_id"),
             inverseJoinColumns = @JoinColumn(name = "prodotto_id")
     )
-    private List<Prodotto> prodotti = new ArrayList<>();
+    private List<Prodotto> prodotti;
 
-    // 🔹 Relazione con gli invitati
+    // --- NUOVI CAMPI PER INVITI E ACCETTAZIONI ---
     @ManyToMany
     @JoinTable(
-            name = "evento_invitati",
+            name = "evento_acquirenti",
             joinColumns = @JoinColumn(name = "evento_id"),
-            inverseJoinColumns = @JoinColumn(name = "utente_id")
+            inverseJoinColumns = @JoinColumn(name = "acquirente_id")
     )
-    private List<UtenteGenerico> invitati = new ArrayList<>();
+    private List<Acquirente> acquirentiInvitati = new ArrayList<>();
 
-    public Evento() {}
+    @ManyToMany
+    @JoinTable(
+            name = "evento_venditori",
+            joinColumns = @JoinColumn(name = "evento_id"),
+            inverseJoinColumns = @JoinColumn(name = "venditore_id")
+    )
+    private List<Venditore> venditoriInvitati = new ArrayList<>();
 
-    public Evento(int id, String nome, String luogo, LocalDateTime data, String descrizione) {
+    @ElementCollection
+    @CollectionTable(name = "evento_accettazioni_acquirenti", joinColumns = @JoinColumn(name = "evento_id"))
+    @MapKeyJoinColumn(name = "acquirente_id")
+    @Column(name = "accettato")
+    private Map<Acquirente, Boolean> accettazioniAcquirenti = new HashMap<>();
+
+    @ElementCollection
+    @CollectionTable(name = "evento_accettazioni_venditori", joinColumns = @JoinColumn(name = "evento_id"))
+    @MapKeyJoinColumn(name = "venditore_id")
+    @Column(name = "accettato")
+    private Map<Venditore, Boolean> accettazioniVenditori = new HashMap<>();
+
+    // --- COSTRUTTORI ---
+    public Evento() {
+        this.prodotti = new ArrayList<>();
+    }
+
+    public Evento(int id, String nomeEvento, String luogo, LocalDateTime data, String descrizione) {
         this.id = id;
-        this.nome = nome;
+        this.nomeEvento = nomeEvento;
         this.luogo = luogo;
         this.data = data;
         this.descrizione = descrizione;
+        this.prodotti = new ArrayList<>();
     }
 
-    // --- getter/setter ---
+    // --- GETTER / SETTER ---
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
 
-    public String getNome() { return nome; }
-    public void setNome(String nome) { this.nome = nome; }
+    public String getNomeEvento() { return nomeEvento; }
+    public void setNomeEvento(String nomeEvento) { this.nomeEvento = nomeEvento; }
 
     public String getLuogo() { return luogo; }
     public void setLuogo(String luogo) { this.luogo = luogo; }
@@ -65,28 +88,50 @@ public class Evento {
     public List<Prodotto> getProdotti() { return prodotti; }
     public void setProdotti(List<Prodotto> prodotti) { this.prodotti = prodotti; }
 
-    public List<UtenteGenerico> getInvitati() { return invitati; }
-    public void setInvitati(List<UtenteGenerico> invitati) { this.invitati = invitati; }
-
-    // --- Metodi di supporto ---
+    // --- METODI PER PRODOTTI ---
     public void aggiungiProdotto(Prodotto p) {
-        if (p != null && !prodotti.contains(p)) {
-            prodotti.add(p);
+        if (p == null) return;
+        for (Prodotto x : prodotti) {
+            if (x.getId() == p.getId()) return;
         }
+        prodotti.add(p);
     }
 
     public void rimuoviProdotto(Prodotto p) {
-        prodotti.remove(p);
+        if (p == null) return;
+        prodotti.removeIf(x -> x.getId() == p.getId());
     }
 
-    public void invitaUtente(UtenteGenerico u) {
-        if (u != null && !invitati.contains(u)) {
-            invitati.add(u);
+    // --- METODI PER INVITI E ACCETTAZIONI ---
+    public void invitaAcquirente(Acquirente a) {
+        if (!acquirentiInvitati.contains(a)) {
+            acquirentiInvitati.add(a);
+            accettazioniAcquirenti.put(a, false);
         }
     }
 
-    public void rimuoviInvitato(UtenteGenerico u) {
-        invitati.remove(u);
+    public void invitaVenditore(Venditore v) {
+        if (!venditoriInvitati.contains(v)) {
+            venditoriInvitati.add(v);
+            accettazioniVenditori.put(v, false);
+        }
     }
 
+    public void accettaInvitoAcquirente(Acquirente a) {
+        if (accettazioniAcquirenti.containsKey(a)) {
+            accettazioniAcquirenti.put(a, true);
+        }
+    }
+
+    public void accettaInvitoVenditore(Venditore v) {
+        if (accettazioniVenditori.containsKey(v)) {
+            accettazioniVenditori.put(v, true);
+        }
+    }
+
+    // --- GETTER PER LISTE E MAPPE ---
+    public List<Acquirente> getAcquirentiInvitati() { return acquirentiInvitati; }
+    public List<Venditore> getVenditoriInvitati() { return venditoriInvitati; }
+    public Map<Acquirente, Boolean> getAccettazioniAcquirenti() { return accettazioniAcquirenti; }
+    public Map<Venditore, Boolean> getAccettazioniVenditori() { return accettazioniVenditori; }
 }
