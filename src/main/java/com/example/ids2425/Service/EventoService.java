@@ -1,47 +1,66 @@
 package com.example.ids2425.Service;
 
-import com.example.ids2425.Model.Evento;
-import com.example.ids2425.Model.Prodotto;
 import com.example.ids2425.Model.Acquirente;
+import com.example.ids2425.Model.Evento;
 import com.example.ids2425.Model.Venditore;
+import com.example.ids2425.Repository.AcquirenteRepository;
+import com.example.ids2425.Repository.EventoRepository;
+import com.example.ids2425.Repository.VenditoreRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-
+@Service
 public class EventoService {
 
-    public Evento creaEvento(int id, String nome, String luogo, LocalDateTime data, String descrizione) {
-        return new Evento(id, nome, luogo, data, descrizione);
+    @Autowired
+    private EventoRepository eventoRepo;
+
+    @Autowired
+    private AcquirenteRepository acquirenteRepo;
+
+    @Autowired
+    private VenditoreRepository venditoreRepo;
+
+    /**
+     * Prenota un acquirente per un evento.
+     * @param eventoId ID dell'evento
+     * @param acquirenteId ID dell'acquirente
+     * @return true se la prenotazione è avvenuta con successo, false altrimenti
+     */
+    @Transactional
+    public boolean prenotaEventoAcquirente(int eventoId, int acquirenteId) {
+        Evento evento = eventoRepo.findById(eventoId).orElse(null);
+        Acquirente acquirente = acquirenteRepo.findById(acquirenteId).orElse(null);
+        if (evento == null || acquirente == null) return false;
+
+        // Aggiunge l'acquirente all'evento in sicurezza
+        if (!evento.getAcquirenti().contains(acquirente)) {
+            evento.getAcquirenti().add(acquirente);
+        }
+
+        eventoRepo.save(evento);
+        return true;
     }
 
-    public void aggiungiProdotto(Evento e, Prodotto p) {
-        if (e == null || p == null) return;
-        e.aggiungiProdotto(p);
-    }
+    /**
+     * Prenota un venditore per un evento.
+     * @param eventoId ID dell'evento
+     * @param venditoreId ID del venditore
+     * @return true se la prenotazione è avvenuta con successo, false altrimenti
+     */
+    @Transactional
+    public boolean prenotaEventoVenditore(int eventoId, int venditoreId) {
+        Evento evento = eventoRepo.findById(eventoId).orElse(null);
+        Venditore venditore = venditoreRepo.findById(venditoreId).orElse(null);
+        if (evento == null || venditore == null) return false;
 
-    public void rimuoviProdotto(Evento e, Prodotto p) {
-        if (e == null || p == null) return;
-        e.rimuoviProdotto(p);
-    }
+        // Aggiunge il venditore all'evento in sicurezza
+        if (!evento.getVenditori().contains(venditore)) {
+            evento.getVenditori().add(venditore);
+        }
 
-    // --- NUOVI METODI PER INVITI E ACCETTAZIONE ---
-
-    public void invitaAcquirente(Evento evento, Acquirente acquirente) {
-        if (evento == null || acquirente == null) return;
-        evento.invitaAcquirente(acquirente);
-    }
-
-    public void invitaVenditore(Evento evento, Venditore venditore) {
-        if (evento == null || venditore == null) return;
-        evento.invitaVenditore(venditore);
-    }
-
-    public void accettaInvitoAcquirente(Evento evento, Acquirente acquirente) {
-        if (evento == null || acquirente == null) return;
-        evento.accettaInvitoAcquirente(acquirente);
-    }
-
-    public void accettaInvitoVenditore(Evento evento, Venditore venditore) {
-        if (evento == null || venditore == null) return;
-        evento.accettaInvitoVenditore(venditore);
+        eventoRepo.save(evento);
+        return true;
     }
 }
