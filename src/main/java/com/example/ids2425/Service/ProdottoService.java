@@ -1,63 +1,108 @@
 package com.example.ids2425.Service;
 
-import com.example.ids2425.Model.Prodotto;
-import com.example.ids2425.Model.Venditore;
+import com.example.ids2425.DTO.ProdottoDTO;
+import com.example.ids2425.DTO.ProdottoMapper;
+import com.example.ids2425.Model.*;
+import com.example.ids2425.Repository.CertificazioneRepository;
+import com.example.ids2425.Repository.CuratoreRepository;
+import com.example.ids2425.Repository.ProdottoRepository;
+import com.example.ids2425.Repository.VenditoreRepository;
+import com.example.ids2425.exceptions.BusinessException;
+import com.example.ids2425.exceptions.NotFoundException;
+import jakarta.transaction.Transactional;
+import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
+@Service
+@Transactional
 public class ProdottoService {
 
-    public Prodotto creaProdotto(int id, String nome, double prezzo, Venditore venditore) {
-        Prodotto p = new Prodotto(id, nome, prezzo);
-        // se nel tuo Model hai un campo venditore dentro Prodotto, impostalo qui
-        // p.setVenditore(venditore);
-        return p;
+    private final ProdottoRepository prodottoRepo;
+    private final VenditoreRepository venditoreRepo;
+    private final CuratoreRepository curatoreRepo;
+    private final CertificazioneRepository certificazioneRepo;
+
+    public ProdottoService(ProdottoRepository prodottoRepo,
+                           VenditoreRepository venditoreRepo,
+                           CuratoreRepository curatoreRepo,
+                           CertificazioneRepository certificazioneRepo) {
+        this.prodottoRepo = prodottoRepo;
+        this.venditoreRepo = venditoreRepo;
+        this.curatoreRepo = curatoreRepo;
+        this.certificazioneRepo = certificazioneRepo;
     }
 
-    public void aggiornaPrezzo(Prodotto p, double nuovoPrezzo) {
-        if (nuovoPrezzo <= 0) throw new IllegalArgumentException("Prezzo non valido");
+    public ProdottoDTO creaProdotto(Long venditoreId, String nome, BigDecimal prezzo) {
+        Venditore v = venditoreRepo.findById(venditoreId)
+                .orElseThrow(() -> new NotFoundException("Venditore non trovato: " + venditoreId));
+        Prodotto p = new Prodotto();
+        p.setNome(nome);
+        p.setPrezzo(prezzo);
+        p.setVenditore(v);
+        p.setStato(StatoProdotto.IN_VALIDAZIONE);
+        p = prodottoRepo.save(p);
+        return ProdottoMapper.toDTO(p);
+    }
+
+    public ProdottoDTO getById(Long prodottoId) {
+        Prodotto p = prodottoRepo.findById(prodottoId)
+                .orElseThrow(() -> new NotFoundException("Prodotto non trovato: " + prodottoId));
+        return ProdottoMapper.toDTO(p);
+    }
+
+    public List<ProdottoDTO> listaVendibili() {
+        return ProdottoMapper.toDTO(prodottoRepo.findByStato(StatoProdotto.APPROVATO));
+    }
+
+    public ProdottoDTO approvaProdotto(Long prodottoId, Long curatoreId, String descrizioneCertificazione) {
+        Prodotto p = prodottoRepo.findById(prodottoId)
+                .orElseThrow(() -> new NotFoundException("Prodotto non trovato: " + prodottoId));
+        if (p.getStato() == StatoProdotto.APPROVATO) throw new BusinessException("Già approvato.");
+        if (p.getStato() == StatoProdotto.RIFIUTATO) throw new BusinessException("Rifiutato: non approvabile.");
+        if (certificazioneRepo.existsByProdottoId(prodottoId))
+            throw new BusinessException("Certificazione già presente.");
+
+        Curatore c = curatoreRepo.findById(curatoreId)
+                .orElseThrow(() -> new NotFoundException("Curatore non trovato: " + curatoreId));
+
+        Certificazione cert = new Certificazione();
+        cert.setProdotto(p);
+        cert.setCuratoreValidatore(c);
+        cert.setDescrizione(descrizioneCertificazione);
+        cert.setDataApprovazione(LocalDateTime.now());
+        certificazioneRepo.save(cert);
+
+        p.setStato(StatoProdotto.APPROVATO);
+        p.setCertificazione(cert);
+
+        return ProdottoMapper.toDTO(p);
+    }
+
+    public ProdottoDTO rifiutaProdotto(Long prodottoId, String motivo) {
+        Prodotto p = prodottoRepo.findById(prodottoId)
+                .orElseThrow(() -> new NotFoundException("Prodotto non trovato: " + prodottoId));
+        if (p.getStato() == StatoProdotto.APPROVATO) throw new BusinessException("Già approvato.");
+        if (certificazioneRepo.existsByProdottoId(prodottoId))
+            throw new BusinessException("Certificazione già presente.");
+        p.setStato(StatoProdotto.RIFIUTATO);
+        return ProdottoMapper.toDTO(p);
+    }
+
+    public ProdottoDTO aggiornaPrezzo(Long prodottoId, BigDecimal nuovoPrezzo) {
+        Prodotto p = prodottoRepo.findById(prodottoId)
+                .orElseThrow(() -> new NotFoundException("Prodotto non trovato: " + prodottoId));
         p.setPrezzo(nuovoPrezzo);
+        return ProdottoMapper.toDTO(p);
     }
 
-    public void aggiornaNome(Prodotto p, String nuovoNome) {
-        if (nuovoNome == null || nuovoNome.isBlank()) throw new IllegalArgumentException("Nome non valido");
-        p.setNome(nuovoNome);
-    }
-
-    public void assegnaVenditore(Prodotto p, Venditore v) {
-        // se il tuo Model prevede il venditore sul prodotto, setta qui.
-        // p.setVenditore(v);
-    }
-
-    public void aggiungiAlCatalogo(List<Prodotto> catalogo, Prodotto p) {
-        if (catalogo == null) return;
-        if (catalogo.stream().noneMatch(x -> x.getId() == p.getId())) {
-            catalogo.add(p);
-        }
-    }
-
-    public void rimuoviDaCatalogo(List<Prodotto> catalogo, Prodotto p) {
-        if (catalogo == null) return;
-        catalogo.removeIf(x -> x.getId() == p.getId());
-    }
-
-    public List<Prodotto> cerca(List<Prodotto> catalogo, String testo) {
-        if (catalogo == null) return List.of();
-        if (testo == null || testo.isBlank()) return new ArrayList<>(catalogo);
-        String t = testo.toLowerCase(Locale.ITALIAN);
-        return catalogo.stream()
-                .filter(p -> p.getNome() != null && p.getNome().toLowerCase(Locale.ITALIAN).contains(t))
-                .collect(Collectors.toList());
-    }
-
-    public List<Prodotto> prodottiDiVenditore(List<Prodotto> catalogo, Venditore v) {
-        if (catalogo == null || v == null) return List.of();
-        // se hai il campo venditore su Prodotto, filtra per quello
-        // return catalogo.stream().filter(p -> p.getVenditore()!=null && p.getVenditore().getId()==v.getId()).toList();
-        return List.of(); // rimuovi quando avrai il campo nel Model
+    public void elimina(Long prodottoId) {
+        prodottoRepo.delete(prodottoRepo.findById(prodottoId)
+                .orElseThrow(() -> new NotFoundException("Prodotto non trovato: " + prodottoId)));
     }
 }
-

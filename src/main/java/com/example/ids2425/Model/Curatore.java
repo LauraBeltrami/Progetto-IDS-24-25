@@ -1,37 +1,33 @@
 package com.example.ids2425.Model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
+@Table(name = "curatori")
 public class Curatore {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int id;
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
+    @NotBlank
+    @Column(nullable = false)
     private String nome;
 
-    // relazione inversa: un curatore può validare più certificazioni
-    @OneToMany(mappedBy = "curatoreValidatore")
-    private List<Certificazione> certificazioni;
+    @OneToMany(mappedBy = "curatoreValidatore", fetch = FetchType.LAZY)
+    private Set<Certificazione> certificazioni = new HashSet<>();
 
-    // costruttore vuoto richiesto da JPA
     public Curatore() {}
+    public Curatore(Long id, String nome) { this.id = id; this.nome = nome; }
 
-    public Curatore(int id, String nome) {
-        this.id = id;
-        this.nome = nome;
-    }
-
-    public int getId() { return id; }
-    public void setId(int id) { this.id = id; }
-
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
     public String getNome() { return nome; }
     public void setNome(String nome) { this.nome = nome; }
-
-    public List<Certificazione> getCertificazioni() { return certificazioni; }
-    public void setCertificazioni(List<Certificazione> certificazioni) {
-        this.certificazioni = certificazioni;
-    }
+    public Set<Certificazione> getCertificazioni() { return certificazioni; }
+    public void setCertificazioni(Set<Certificazione> certificazioni) { this.certificazioni = certificazioni; }
 }

@@ -1,69 +1,72 @@
 package com.example.ids2425.Model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Entity
-@Table(name = "eventi")
+@Table(name = "eventi", indexes = @Index(name="idx_evento_animatore", columnList = "animatore_id"))
 public class Evento {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    @Column(nullable = false)
-    private String titolo;
-
-    @Column(nullable = false)
+    @NotBlank
+    @Column(nullable = false) private String titolo;
     private String descrizione;
+    @NotBlank @Column(nullable = false) private String luogo;
 
-    @Column(nullable = false)
-    private Date data;
+    @NotNull
+    @Column(nullable = false) private LocalDateTime inizio;
+    @NotNull @Column(nullable = false) private LocalDateTime fine;
 
-    // Relazioni con Acquirenti e Venditori
-    @ManyToMany
-    @JoinTable(
-            name = "evento_acquirenti",
-            joinColumns = @JoinColumn(name = "evento_id"),
-            inverseJoinColumns = @JoinColumn(name = "acquirente_id")
-    )
-    private List<Acquirente> acquirenti = new ArrayList<>();
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "animatore_id", nullable = false)
+    private Animatore animatore;
 
-    @ManyToMany
-    @JoinTable(
-            name = "evento_venditori",
-            joinColumns = @JoinColumn(name = "evento_id"),
-            inverseJoinColumns = @JoinColumn(name = "venditore_id")
-    )
-    private List<Venditore> venditori = new ArrayList<>();
+    @OneToMany(mappedBy = "evento", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<InvitoEvento> inviti = new HashSet<>();
 
     public Evento() {}
-
-    public Evento(Integer id, String titolo, String descrizione, Date data) {
-        this.id = id;
-        this.titolo = titolo;
-        this.descrizione = descrizione;
-        this.data = data;
+    public Evento(Long id, String titolo, String descrizione, String luogo,
+                  LocalDateTime inizio, LocalDateTime fine, Animatore animatore) {
+        this.id = id; this.titolo = titolo; this.descrizione = descrizione; this.luogo = luogo;
+        this.inizio = inizio; this.fine = fine; this.animatore = animatore;
     }
 
-    public Integer getId() { return id; }
-    public void setId(Integer id) { this.id = id; }
-    public String getTitolo() { return titolo; }
-    public void setTitolo(String titolo) { this.titolo = titolo; }
-    public String getDescrizione() { return descrizione; }
-    public void setDescrizione(String descrizione) { this.descrizione = descrizione; }
-    public Date getData() { return data; }
-    public void setData(Date data) { this.data = data; }
-
-    public List<Acquirente> getAcquirenti() { return acquirenti; }
-    public List<Venditore> getVenditori() { return venditori; }
-
-    // Metodi di supporto
-    public void aggiungiAcquirente(Acquirente a) {
-        if (a != null && !acquirenti.contains(a)) acquirenti.add(a);
+    public Long getId() {
+        return id;
     }
 
-    public void aggiungiVenditore(Venditore v) {
-        if (v != null && !venditori.contains(v)) venditori.add(v);
+    public String getTitolo() {
+        return titolo;
     }
+
+    public String getDescrizione() {
+        return descrizione;
+    }
+
+    public String getLuogo() {
+        return luogo;
+    }
+
+    public LocalDateTime getInizio() {
+        return inizio;
+    }
+
+    public LocalDateTime getFine() {
+        return fine;
+    }
+
+    public Animatore getAnimatore() {
+        return animatore;
+    }
+
+    public Set<InvitoEvento> getInviti() {
+        return inviti;
+    }
+// getter/setter...
 }

@@ -1,69 +1,134 @@
 package com.example.ids2425.Service;
 
+import com.example.ids2425.DTO.CarrelloDTO;
+import com.example.ids2425.DTO.CarrelloMapper;
 import com.example.ids2425.Model.*;
-import com.example.ids2425.Repository.CarrelloRepository;
+import com.example.ids2425.Repository.*;
+import com.example.ids2425.exceptions.BusinessException;
+import com.example.ids2425.exceptions.NotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional
 public class CarrelloService {
 
     private final CarrelloRepository carrelloRepo;
+    private final CarrelloItemRepository carrelloItemRepo;
+    private final CarrelloBundleItemRepository carrelloBundleItemRepo;
+    private final AcquirenteRepository acquirenteRepo;
+    private final ProdottoRepository prodottoRepo;
+    private final BundleRepository bundleRepo;
 
-    public CarrelloService(CarrelloRepository carrelloRepo) {
+    public CarrelloService(CarrelloRepository carrelloRepo,
+                           CarrelloItemRepository carrelloItemRepo,
+                           CarrelloBundleItemRepository carrelloBundleItemRepo,
+                           AcquirenteRepository acquirenteRepo,
+                           ProdottoRepository prodottoRepo,
+                           BundleRepository bundleRepo) {
         this.carrelloRepo = carrelloRepo;
+        this.carrelloItemRepo = carrelloItemRepo;
+        this.carrelloBundleItemRepo = carrelloBundleItemRepo;
+        this.acquirenteRepo = acquirenteRepo;
+        this.prodottoRepo = prodottoRepo;
+        this.bundleRepo = bundleRepo;
     }
 
-    @Transactional
-    public Carrello aggiungiProdotto(Carrello carrello, Prodotto prodotto, int quantita) {
-        if (carrello == null || prodotto == null || quantita <= 0) return carrello;
+    private Carrello loadOrCreateGraph(Long acquirenteId) {
+        return carrelloRepo.findGraphByAcquirenteId(acquirenteId).orElseGet(() -> {
+            Acquirente a = acquirenteRepo.findById(acquirenteId)
+                    .orElseThrow(() -> new NotFoundException("Acquirente non trovato: " + acquirenteId));
+            Carrello c = new Carrello();
+            c.setAcquirente(a);
+            return carrelloRepo.save(c);
+        });
+    }
 
-        var existing = carrello.getItems().stream()
-                .filter(ci -> ci.getProdotto().getId().equals(prodotto.getId()))
-                .findFirst().orElse(null);
+    public CarrelloDTO getDettaglio(Long acquirenteId) {
+        return CarrelloMapper.toDTO(loadOrCreateGraph(acquirenteId));
+    }
 
-        if (existing != null) {
-            existing.setQuantita(existing.getQuantita() + quantita);
+    public CarrelloDTO clear(Long acquirenteId) {
+        Carrello c = loadOrCreateGraph(acquirenteId);
+        c.getItems().clear();
+        c.getBundleItems().clear();
+        return CarrelloMapper.toDTO(c);
+    }
+
+    // -------- prodotti --------
+    public CarrelloDTO addItem(Long acquirenteId, Long prodottoId, int quantita) {
+        if (quantita <= 0) throw new BusinessException("Quantità deve essere > 0.");
+        Carrello c = loadOrCreateGraph(acquirenteId);
+
+        Prodotto p = prodottoRepo.findById(prodottoId)
+                .orElseThrow(() -> new NotFoundException("Prodotto non trovato: " + prodottoId));
+        if (p.getStato() != StatoProdotto.APPROVATO)
+            throw new BusinessException("Prodotto non approvato.");
+
+        CarrelloItem item = carrelloItemRepo.findByCarrelloIdAndProdottoId(c.getId(), p.getId()).orElse(null);
+        if (item == null) {
+            item = new CarrelloItem(c, p, quantita);
+            c.getItems().add(item);
         } else {
-            carrello.getItems().add(new CarrelloItem(null, carrello, prodotto, quantita));
+            item.setQuantita(item.getQuantita() + quantita);
         }
-        return carrelloRepo.save(carrello);
+        return CarrelloMapper.toDTO(c);
     }
 
-    @Transactional
-    public Carrello rimuoviProdotto(Carrello carrello, Prodotto prodotto) {
-        if (carrello == null || prodotto == null) return carrello;
-        carrello.getItems().removeIf(ci -> ci.getProdotto().getId().equals(prodotto.getId()));
-        return carrelloRepo.save(carrello);
-    }
-
-    /** Totale corrente del carrello */
-    public double totale(Carrello carrello) {
-        return (carrello == null) ? 0.0 : carrello.getTotale();
-    }
-
-    @Transactional
-    public Carrello svuota(Carrello carrello) {
-        if (carrello == null) return null;
-        carrello.getItems().clear();
-        return carrelloRepo.save(carrello);
-    }
-
-    /** Esempio di checkout “in memoria” (Pagamento non JPA): compila, non è usato dai controller */
-    public Pagamento checkout(Carrello carrello, String metodo) {
-        if (carrello == null || carrello.getNumeroArticoli() == 0) {
-            throw new IllegalStateException("Carrello vuoto, impossibile fare il checkout.");
+    public CarrelloDTO updateQuantita(Long acquirenteId, Long prodottoId, int quantita) {
+        Carrello c = loadOrCreateGraph(acquirenteId);
+        CarrelloItem item = carrelloItemRepo.findByCarrelloIdAndProdottoId(c.getId(), prodottoId)
+                .orElseThrow(() -> new NotFoundException("Articolo non presente nel carrello."));
+        if (quantita <= 0) {
+            c.getItems().remove(item);
+            carrelloItemRepo.delete(item);
+        } else {
+            item.setQuantita(quantita);
         }
-        double tot = carrello.getTotale();
-        Pagamento pagamento = new Pagamento(
-                1, // id fittizio
-                carrello.getAcquirente(),
-                tot,
-                metodo
-        );
-        pagamento.completa();
-        carrello.getItems().clear();
-        carrelloRepo.save(carrello);
-        return pagamento;
+        return CarrelloMapper.toDTO(c);
+    }
+
+    public CarrelloDTO removeItem(Long acquirenteId, Long prodottoId) {
+        return updateQuantita(acquirenteId, prodottoId, 0);
+    }
+
+    // -------- bundle --------
+    public CarrelloDTO addBundle(Long acquirenteId, Long bundleId, int quantita) {
+        if (quantita <= 0) throw new BusinessException("Quantità deve essere > 0.");
+        Carrello c = loadOrCreateGraph(acquirenteId);
+
+        Bundle b = bundleRepo.findById(bundleId)
+                .orElseThrow(() -> new NotFoundException("Bundle non trovato: " + bundleId));
+
+        boolean nonApprovato = b.getItems().stream()
+                .map(BundleItem::getProdotto)
+                .anyMatch(p -> p.getStato() != StatoProdotto.APPROVATO);
+        if (nonApprovato) throw new BusinessException("Il bundle contiene prodotti non approvati.");
+
+        CarrelloBundleItem r = carrelloBundleItemRepo.findByCarrelloIdAndBundleId(c.getId(), b.getId()).orElse(null);
+        if (r == null) {
+            r = new CarrelloBundleItem(c, b, quantita);
+            c.getBundleItems().add(r);
+        } else {
+            r.setQuantita(r.getQuantita() + quantita);
+        }
+        return CarrelloMapper.toDTO(c);
+    }
+
+    public CarrelloDTO updateQuantitaBundle(Long acquirenteId, Long bundleId, int quantita) {
+        Carrello c = loadOrCreateGraph(acquirenteId);
+        CarrelloBundleItem r = carrelloBundleItemRepo.findByCarrelloIdAndBundleId(c.getId(), bundleId)
+                .orElseThrow(() -> new NotFoundException("Bundle non presente nel carrello."));
+        if (quantita <= 0) {
+            c.getBundleItems().remove(r);
+            carrelloBundleItemRepo.delete(r);
+        } else {
+            r.setQuantita(quantita);
+        }
+        return CarrelloMapper.toDTO(c);
+    }
+
+    public CarrelloDTO removeBundle(Long acquirenteId, Long bundleId) {
+        return updateQuantitaBundle(acquirenteId, bundleId, 0);
     }
 }

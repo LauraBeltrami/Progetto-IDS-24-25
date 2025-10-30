@@ -1,66 +1,86 @@
 package com.example.ids2425.Service;
 
-import com.example.ids2425.Model.Acquirente;
+import com.example.ids2425.DTO.EventoDTO;
+import com.example.ids2425.DTO.EventoMapper;
+
+import com.example.ids2425.Model.Animatore;
 import com.example.ids2425.Model.Evento;
+import com.example.ids2425.Model.InvitoEvento;
 import com.example.ids2425.Model.Venditore;
-import com.example.ids2425.Repository.AcquirenteRepository;
+import com.example.ids2425.Repository.AnimatoreRepository;
 import com.example.ids2425.Repository.EventoRepository;
+import com.example.ids2425.Repository.InvitoEventoRepository;
 import com.example.ids2425.Repository.VenditoreRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.ids2425.exceptions.BusinessException;
+import com.example.ids2425.exceptions.NotFoundException;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
+@Transactional
 public class EventoService {
 
-    @Autowired
-    private EventoRepository eventoRepo;
+    private final AnimatoreRepository animatoreRepo;
+    private final EventoRepository eventoRepo;
+    private final InvitoEventoRepository invitoRepo;
+    private final VenditoreRepository venditoreRepo;
 
-    @Autowired
-    private AcquirenteRepository acquirenteRepo;
-
-    @Autowired
-    private VenditoreRepository venditoreRepo;
-
-    /**
-     * Prenota un acquirente per un evento.
-     * @param eventoId ID dell'evento
-     * @param acquirenteId ID dell'acquirente
-     * @return true se la prenotazione è avvenuta con successo, false altrimenti
-     */
-    @Transactional
-    public boolean prenotaEventoAcquirente(int eventoId, int acquirenteId) {
-        Evento evento = eventoRepo.findById(eventoId).orElse(null);
-        Acquirente acquirente = acquirenteRepo.findById(acquirenteId).orElse(null);
-        if (evento == null || acquirente == null) return false;
-
-        // Aggiunge l'acquirente all'evento in sicurezza
-        if (!evento.getAcquirenti().contains(acquirente)) {
-            evento.getAcquirenti().add(acquirente);
-        }
-
-        eventoRepo.save(evento);
-        return true;
+    public EventoService(AnimatoreRepository animatoreRepo,
+                         EventoRepository eventoRepo,
+                         InvitoEventoRepository invitoRepo,
+                         VenditoreRepository venditoreRepo) {
+        this.animatoreRepo = animatoreRepo;
+        this.eventoRepo = eventoRepo;
+        this.invitoRepo = invitoRepo;
+        this.venditoreRepo = venditoreRepo;
     }
 
-    /**
-     * Prenota un venditore per un evento.
-     * @param eventoId ID dell'evento
-     * @param venditoreId ID del venditore
-     * @return true se la prenotazione è avvenuta con successo, false altrimenti
-     */
-    @Transactional
-    public boolean prenotaEventoVenditore(int eventoId, int venditoreId) {
-        Evento evento = eventoRepo.findById(eventoId).orElse(null);
-        Venditore venditore = venditoreRepo.findById(venditoreId).orElse(null);
-        if (evento == null || venditore == null) return false;
+    // --- Eventi ---
+    public EventoDTO creaEvento(Long animatoreId, String titolo, String descrizione,
+                                String luogo, LocalDateTime inizio, LocalDateTime fine) {
+        if (!inizio.isBefore(fine)) throw new BusinessException("Inizio deve precedere Fine.");
+        Animatore a = animatoreRepo.findById(animatoreId)
+                .orElseThrow(() -> new NotFoundException("Animatore non trovato: " + animatoreId));
+        Evento e = eventoRepo.save(new Evento(null, titolo, descrizione, luogo, inizio, fine, a));
+        e = eventoRepo.findGraphById(e.getId()).orElse(e);
+        return EventoMapper.toDTO(e);
+    }
 
-        // Aggiunge il venditore all'evento in sicurezza
-        if (!evento.getVenditori().contains(venditore)) {
-            evento.getVenditori().add(venditore);
-        }
+    public EventoDTO getEvento(Long eventoId) {
+        Evento e = eventoRepo.findGraphById(eventoId)
+                .orElseThrow(() -> new NotFoundException("Evento non trovato: " + eventoId));
+        return EventoMapper.toDTO(e);
+    }
 
-        eventoRepo.save(evento);
-        return true;
+    public List<EventoDTO> listaEventiAnimatore(Long animatoreId) {
+        return EventoMapper.toDTO(eventoRepo.findGraphByAnimatoreId(animatoreId));
+    }
+
+    // --- Inviti (solo creazione/rimozione) ---
+    public EventoDTO invita(Long eventoId, Long venditoreId, String nota) {
+        Evento e = eventoRepo.findGraphById(eventoId)
+                .orElseThrow(() -> new NotFoundException("Evento non trovato: " + eventoId));
+        Venditore v = venditoreRepo.findById(venditoreId)
+                .orElseThrow(() -> new NotFoundException("Venditore/Distributore non trovato: " + venditoreId));
+
+        invitoRepo.findByEventoIdAndVenditoreId(eventoId, venditoreId).ifPresent(x -> {
+            throw new BusinessException("Già invitato a questo evento.");
+        });
+
+        e.getInviti().add(new InvitoEvento(e, v, nota));
+        return EventoMapper.toDTO(e);
+    }
+
+    public EventoDTO rimuoviInvito(Long eventoId, Long venditoreId) {
+        Evento e = eventoRepo.findGraphById(eventoId)
+                .orElseThrow(() -> new NotFoundException("Evento non trovato: " + eventoId));
+        InvitoEvento inv = invitoRepo.findByEventoIdAndVenditoreId(eventoId, venditoreId)
+                .orElseThrow(() -> new NotFoundException("Invito non trovato."));
+        e.getInviti().remove(inv);
+        invitoRepo.delete(inv);
+        return EventoMapper.toDTO(e);
     }
 }
