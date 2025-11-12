@@ -44,5 +44,4 @@ public class InvitoEvento {
     public String getNota() {
         return nota;
     }
-// getter/setter...
 }

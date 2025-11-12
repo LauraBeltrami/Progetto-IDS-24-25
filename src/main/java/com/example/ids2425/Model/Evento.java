@@ -68,5 +68,4 @@ public class Evento {
     public Set<InvitoEvento> getInviti() {
         return inviti;
     }
-// getter/setter...
 }
